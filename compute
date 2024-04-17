@@ -96,7 +96,7 @@ class Compute:
         If print_dont_return is set to True, then instead of returning, the number will be printed out as it is finished processing followed by the sum at the end.
         '''
         sum = 0
-        returnList = []
+        return_list = []
         # If the user isn't piping in, this should return True
         is_terminal = sys.stdin.isatty()
 
@@ -121,11 +121,11 @@ class Compute:
             processed_num = self.__process_limit(sum, self.__process_threshold(num))
             # increment the sum by the proccessed num and either append it (as a string) to the list to be returned or print it (if desired)
             sum += processed_num
-            returnList.append(str(processed_num)) if not print_dont_return else print(processed_num)
+            return_list.append(str(processed_num)) if not print_dont_return else print(processed_num)
 
         # finally wrap up the processing by appending the sum (converted to string) to the returning list (or printing it outright if desired)
-        returnList.append(str(sum)) if not print_dont_return else print(sum)
-        return returnList if not print_dont_return else None
+        return_list.append(str(sum)) if not print_dont_return else print(sum)
+        return return_list if not print_dont_return else None
 
 
 # If for some reason this file gets imported, we don't want the main code running. (The functions defined above are re-usable)
