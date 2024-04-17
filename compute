@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+
+import sys
+from typing import TextIO
+
+class Compute:
+    '''
+    A custom class for producing a tabular single column list of numbers adhering to the provided threshold and limit
+    '''
+    threshold = 0
+    limit = 0
+    min = 0
+    max = 0
+    allow_scientific_notation = False
+    skip_invalid_numbers = False
+
+    def __init__(self, threshold: str, limit: str, forbid_scientific_notation:bool=False, skip_invalid:bool=False, min:int|float=0.0, max:int|float=1000000000.0):
+        # Set the variables that don't need additional proccessing
+        self.allow_scientific_notation = not forbid_scientific_notation
+        self.skip_invalid_numbers = skip_invalid
+        self.min = min
+        self.max = max
+        
+        # Ensures that the threshold and limit are both numbers (int or float) and are within the defined numeric limit
+        self.threshold = self.__ensure_limit(self.__convert_to_number(threshold))
+        self.limit = self.__ensure_limit(self.__convert_to_number(limit))
+
+        if self.threshold is None or self.limit is None:
+            raise ValueError
+    
+    def __convert_to_number(self, value: str) -> int|float|None:
+        '''
+        Checks if the provided argument is a number (int or float) and converts to the appropriate type\n
+        Can be configured to disallow scientific notation (e.g 1e4)
+        '''
+
+        if not self.allow_scientific_notation and "e" in value.lower():
+            return None
+
+        # If the value doesn't contain any decimals, then it should be safe to check with the isnumeric
+        if "." not in value and value.isnumeric():
+            # Should be good to convert, but let's just be safe
+            try:
+                return int(value)
+            except ValueError:
+                return None
+        
+        # If it does have a decimal point, wrap in a try/catch block and try converting to a float, if it fails, it's not a number
+        try:
+            return float(value)
+        except ValueError:
+            return None
+
+    def __process_threshold(self, value: int|float) -> int|float:
+        '''
+        Procceses the value against the threshold and returns the result
+        '''
+        
+        # If value doesn't exceed the threshold, return 0
+        if value <= self.threshold:
+            return 0.0
+        
+        # return the amount the value is over by
+        return value - self.threshold
+    
+    def __process_limit(self, sum: int|float, value: int|float) -> int|float:
+        '''
+        Procceses the value against the limit (ensuring the value+sum doesn't go over the limit)\n
+        If it does, calculates how much is remaining and returns that amount.\n
+        If it doesn't, it returns back the passed in value
+        '''
+        # First verify if adding the value to the sum won't go over the limit (so we can bail early)
+        if sum+value <= self.limit:
+            return value
+        
+        # remaining_limit is the amount that can be added before we hit the limit
+        remaining_limit = self.limit - sum
+
+        # we return the remaining_limit because the value is either the same or larger than the remaining_limit if the first if statement didn't return
+        return remaining_limit
+    
+    def __ensure_limit(self, num: int|float|None) -> int|float|None:
+        '''
+        Ensures that any number is between or equal to min and max (defaults to 0.0 and 1000000000.0)\n
+        Returns the original number if true, otherwise None if false
+        '''
+
+        if num is None:
+            return num
+
+        return num if self.max >= num >= self.min else None
+
+    def process_input(self, data: list[str]|TextIO = sys.stdin, print_dont_return=False) -> list|None:
+        '''
+        Proccesses the input from the provided string list (or TextIO sys.stdin by default) and returns the processed numbers and final sum in a list.\n
+        If print_dont_return is set to True, then instead of returning, the number will be printed out as it is finished processing followed by the sum at the end.
+        '''
+        sum = 0
+        returnList = []
+        # If the user isn't piping in, this should return True
+        is_terminal = sys.stdin.isatty()
+
+        for val in data:
+            # This allows a user to input numbers manually if they don't pipe to stdin or pass in a pre-defined list
+            # If the user has piped in to stdin or passed in a pre-defined list, this won't cause any issues.
+            if is_terminal and val.rstrip() == "":
+                break
+            # must be a number (int or float) and be within the defined numeric limit
+            num = self.__ensure_limit(self.__convert_to_number(val.strip("\n")))
+            if num is None:
+                # Instructions don't provide any restrictions on handling this situation
+                # but a safe assumption is, if something is using this, it will expect the same amount of numbers + 1 to be outputted
+                # so we should set num to equal 0.0
+                # But because one might just want it skipped, a class property has been added to allow the caller to determine if invalid numbers should be skipped or not
+                if self.skip_invalid_numbers:
+                    continue
+
+                num = 0.0
+            
+            # Process the number through the threshhold and limit
+            processed_num = self.__process_limit(sum, self.__process_threshold(num))
+            # increment the sum by the proccessed num and either append it (as a string) to the list to be returned or print it (if desired)
+            sum += processed_num
+            returnList.append(str(processed_num)) if not print_dont_return else print(processed_num)
+
+        # finally wrap up the processing by appending the sum (converted to string) to the returning list (or printing it outright if desired)
+        returnList.append(str(sum)) if not print_dont_return else print(sum)
+        return returnList if not print_dont_return else None
+
+
+# If for some reason this file gets imported, we don't want the main code running. (The functions defined above are re-usable)
+if __name__ == "__main__":
+    # We're expecting two arguments (plus program name)
+    if len(sys.argv) != 3:
+        # Instructions state the program must ONLY output numbers, so don't output any error text.
+        exit(1)
+
+    try:
+        # Set up the Compute class
+        compute = Compute(sys.argv[1], sys.argv[2])
+    except ValueError:
+        exit(1)
+
+    print_only = True # Set this to False if you want to see the action of it returning the list for a single time printing instead of printing each time
+
+    # Now process the input
+    result = compute.process_input(print_dont_return=print_only)
+
+    if not print_only:
+        # Print out the final result
+        # If there's any long scientific notations, it'll just print the scientific notation, whatever is getting the stdout will be expected to parse it if needed.
+        # Alternatively, settings forbid_scientific_notation to True in the instantiation of the Compute class should help avoid that.
+        print('\n'.join(result))
+    
